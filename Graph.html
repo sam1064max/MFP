@@ -1,0 +1,518 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <style>
+      html, body {
+        width:  100%;
+        height: 100%;
+        margin: 0px;
+        margin-top: 10px;
+        margin-left: 10px;
+      }
+
+      #container {
+        width:100%;
+        text-align:center;
+      }
+
+      #left {
+          float:left;
+      }
+
+      #center {
+          float:left;
+          margin:0 auto;
+          width:300px;
+      }
+
+      #right {
+          float:left;
+          margin:0 100px;
+      } 
+    </style>
+    <script>
+    var e = Math.E;
+    var pi = Math.PI;
+    // try{
+      function Plot(params) {
+        this.canvas = document.getElementById(params.canvasId);
+        this.legendCanvas = document.getElementById("legend");
+        this.legendContext = this.legendCanvas.getContext('2d');
+
+        this.enableGrid = false;
+        this.enableAxis = true;
+        this.enableparametric = false;
+
+        this.context = this.canvas.getContext('2d');
+        this.context.canvas.width  = window.innerHeight * (80 / 100);
+        this.context.canvas.height = window.innerHeight * (80 / 100);
+        this.legendContext.canvas.height = this.context.canvas.height;
+
+        this.drawnList = []
+        this.redraw();
+      }
+
+      Plot.prototype.drawAxis = function() {
+        this.context.save();
+        this.context.moveTo(0, this.centerY);
+        this.context.lineTo(this.canvas.width, this.centerY);
+        this.context.moveTo(this.centerX, 0);
+        this.context.lineTo(this.centerX, this.canvas.height);
+        this.context.lineWidth = 2;
+        this.context.stroke();
+
+        var tickSize = 10;
+
+        this.context.font = '8pt Calibri';
+        this.context.textAlign = 'center';
+        this.context.textBaseline = 'top';
+
+
+        var unit = 1;
+        for(var i = this.unitX; i < this.centerX; i += this.unitX) {
+          this.context.moveTo(this.centerX + i, this.centerY + (tickSize / 2));
+          this.context.lineTo(this.centerX + i, this.centerY - (tickSize / 2));
+          
+          this.context.fillText(unit, this.centerX + i, this.centerY + (tickSize / 2) + 3);
+
+          this.context.moveTo(this.centerX - i, this.centerY + (tickSize / 2));
+          this.context.lineTo(this.centerX - i, this.centerY - (tickSize / 2));
+
+          this.context.fillText(-unit, this.centerX - i, this.centerY + (tickSize / 2) + 3);
+          unit += 1;
+        }
+
+        this.context.stroke();
+        this.context.textAlign = 'left';
+        this.context.textBaseline = 'middle';
+
+        var unit = 1;
+        for(var i = this.unitY; i < this.centerY; i += this.unitY) {
+          this.context.moveTo(this.centerX + (tickSize / 2), this.centerY + i);
+          this.context.lineTo(this.centerX - (tickSize / 2), this.centerY + i);
+          
+          this.context.fillText(-unit, this.centerX + (tickSize / 2) + 5, this.centerY + i);
+
+          this.context.moveTo(this.centerX + (tickSize / 2), this.centerY - i);
+          this.context.lineTo(this.centerX - (tickSize / 2), this.centerY - i);
+          
+          this.context.fillText(unit, this.centerX + (tickSize / 2) + 5, this.centerY - i);
+          unit += 1;
+        }
+
+        this.context.stroke();
+        this.context.restore();
+      }
+
+      Plot.prototype.drawGrid = function() {
+        this.context.save();
+        this.context.lineWidth = 0.5;
+        this.context.moveTo(0, this.centerY);
+        this.context.lineTo(this.canvas.width, this.centerY);
+        this.context.moveTo(this.centerX, 0);
+        this.context.lineTo(this.centerX, this.canvas.height);
+
+        var tickSize = this.canvas.height;
+
+        var unit = 1;
+        for(var i = this.unitX; i < this.centerX; i += this.unitX) {
+          this.context.moveTo(this.centerX + i, 0);
+          this.context.lineTo(this.centerX + i, this.canvas.height);
+          
+          this.context.moveTo(this.centerX - i, 0);
+          this.context.lineTo(this.centerX - i, this.canvas.height);
+
+          unit += 1;
+        }
+
+        this.context.stroke();
+        tickSize = this.canvas.width;
+
+        var unit = 1;
+        for(var i = this.unitY; i < this.centerY + this.xShift * this.unitX; i += this.unitY) {
+          this.context.moveTo(0, this.centerY + i);
+          this.context.lineTo(this.canvas.width, this.centerY + i);
+
+          this.context.moveTo(0, this.centerY - i);
+          this.context.lineTo(this.canvas.width, this.centerY - i);
+          
+          unit += 1;
+        }
+
+        this.context.stroke();
+        this.context.restore();
+      }
+
+      Plot.prototype.draw = function(type, x, y, tRangeLeft, tRangeRight, color) {
+        var context = this.context;
+        context.save();
+        context.save();
+        context.translate(this.centerX, this.centerY);
+        context.scale(this.scaleX, -this.scaleY);
+        context.lineWidth = 2;        
+
+        context.beginPath();
+
+        if(type == 1) { 
+          var y = transformString(y);
+          equation = function(x) {return eval(y);}
+
+          console.log(y)
+
+          context.moveTo(this.minX - this.xShift, equation(this.minX - this.xShift));
+
+          for(var x = this.minX + this.iteration - this.xShift; x <= this.maxX - this.xShift; x += this.iteration) {
+            context.lineTo(x, equation(x));
+          }
+        } else {//parametric
+          var x = transformString(x);
+          var y = transformString(y);
+
+          equation_x = function(t) { return eval(x);};
+          equation_y = function(t) { return eval(y);};
+
+          context.moveTo(equation_x(tRangeLeft), equation_y(tRangeLeft));
+
+          for(var t = tRangeLeft + this.iteration; t <= tRangeRight; t += this.iteration) {
+            //console.log("x=" + equation_x(t) +", y="+equation_y(t))
+
+            context.lineTo(equation_x(t), equation_y(t));
+          }
+        }
+       
+        context.restore();
+        context.lineJoin = 'round';
+        context.strokeStyle = color;
+        context.stroke();
+
+        context.restore();
+      };
+
+      
+
+      Plot.prototype.redraw = function() {
+        this.minX = -(eval(parseInt(document.getElementById("xrange").value)));
+        this.maxX = parseInt(eval(document.getElementById("xrange").value));
+        this.minY = -(parseInt(eval(document.getElementById("yrange").value)));
+        this.maxY = parseInt(eval(document.getElementById("yrange").value));
+
+        this.xShift = parseInt(eval(document.getElementById("xshift").value));
+        this.yShift = parseInt(eval(document.getElementById("yshift").value));
+
+
+
+        this.rangeX = this.maxX - this.minX;
+        this.rangeY = this.maxY - this.minY;
+        this.unitX = this.canvas.width / this.rangeX;
+        this.unitY = this.canvas.height / this.rangeY;
+        this.centerY = Math.round(Math.abs(this.minY / this.rangeY) * this.canvas.height) + this.yShift*this.unitY;
+        this.centerX = Math.round(Math.abs(this.minX / this.rangeX) * this.canvas.width) + this.xShift*this.unitX;
+        this.iteration = (this.maxX - this.minX) / 500;
+        this.scaleX = this.canvas.width / this.rangeX;
+        this.scaleY = this.canvas.height / this.rangeY;
+
+        this.context.beginPath();
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.legendContext.beginPath();
+        this.legendContext.clearRect(0, 0, this.legendCanvas.width, this.legendCanvas.height);
+
+        //console.log(this.enableGrid);
+
+        if(this.enableAxis) {
+          this.drawAxis();
+        }
+        if(this.enableGrid) {
+          this.drawGrid();
+        }
+
+        this.legendContext.font = '14pt Calibri';
+        this.legendContext.textAlign = 'left';
+        this.legendContext.textBaseline = 'top';
+
+        console.log("List length = " + this.drawnList.length)
+        for(var i = 0; i < this.drawnList.length; ++i) {
+          this.draw(this.drawnList[i].type, this.drawnList[i].x, this.drawnList[i].y,
+            this.drawnList[i].tRangeL, this.drawnList[i].tRangeR, this.drawnList[i].cl)
+
+          this.legendContext.fillStyle = this.drawnList[i].cl
+          if(this.drawnList[i].type == 0) {
+            this.legendContext.fillText((i + 1) + ") x = " + this.drawnList[i].x + ", y = " + this.drawnList[i].y, 50, 10  + (i * 20));
+          } else {
+            this.legendContext.fillText((i + 1) + ") y = " + this.drawnList[i].y, 50, 10  + (i * 20));
+          }
+        }
+      }
+
+      var plot;
+
+      function loadDocument() {
+        plot = new Plot({
+          canvasId: 'canvas',
+          minX: -15,
+          minY: -15,
+          maxX: 15,
+          maxY: 15
+        });
+      }
+
+
+      function f(){
+        var colorDropDown = document.getElementById("color");
+        var color = colorDropDown.options[colorDropDown.selectedIndex].value;
+
+        if(plot.enableparametric){
+          var x = document.getElementById("x");
+          var y = document.getElementById("y");          
+          
+          try {
+              var tRangeLeft = parseFloat(eval(document.getElementById("tRangeLeft").value));
+              var tRangeRight = parseFloat(eval(document.getElementById("tRangeRight").value));
+
+              console.log("tRangeLeft = " + tRangeLeft)
+              console.log("tRangeRight = " + tRangeRight)
+
+              var t = 2;
+              eval(transformString(x.value.toLowerCase()));
+              eval(transformString(y.value.toLowerCase()));
+
+              plot.drawnList.push({ type: 0, x : x.value.toLowerCase(), y : y.value.toLowerCase(), tRangeL : tRangeLeft,
+                tRangeR : tRangeRight, cl : color})
+              plot.redraw();
+            } catch(err) {
+              alert(err);
+              return;
+            }
+        }
+        else{
+
+          var eq = document.getElementById("eq");
+          try {
+              var x = 2;
+              eval(transformString(eq.value.toLowerCase()));
+
+              plot.drawnList.push({ type: 1, x : "", y : eq.value.toLowerCase(), tRangeL : 0, tRangeR : 0, cl : color})
+              plot.redraw();
+            } catch(err) {
+              alert(err);
+              return;
+            }
+          }
+      }
+
+      function transformString(s) {
+          var matches = s.match(/[a-z][a-z][a-z]+/g)
+          var arr = s.split(/[a-z][a-z][a-z]+/)
+
+          console.log(matches);
+          console.log(arr);
+
+          s1 = "";
+          for(var i = 0; i < arr.length - 1; ++i) {
+            s1 += arr[i];
+            s1 += "Math." + matches[i];
+          }
+          s1 += arr[arr.length - 1];
+
+          //s1 = s1.replace("pi", "Math.PI");
+
+          //s1 = s1.replace(/[^a-zA-z]e[^a-zA-z]/, "Math.E");
+
+          console.log(s1);
+
+          return s1;
+      }
+
+      function erase(){
+        try{
+          plot.drawnList = []
+          plot.xShift = 0
+          plot.yShift = 0
+          document.getElementById("xshift").value = "0"
+          document.getElementById("yshift").value = "0"
+          plot.redraw();
+        }catch(err){
+          alert(err);
+        }
+      }
+
+      function erase_one(){
+        try{
+          var index = parseInt(document.getElementById("erase_index").value)
+          if(plot.drawnList.length >= index) {
+            plot.drawnList.splice(index - 1, 1)
+          }
+          plot.redraw();
+        }catch(err){
+          alert(err);
+        }
+      }
+
+      function toggleCheckbox(id) {
+        var elem = document.getElementById(id);
+        console.log(id);
+        if(id === "enablegrid") {
+            plot.enableGrid = elem.checked;
+            plot.redraw();
+        } else if(id === "enableaxis"){
+            plot.enableAxis = elem.checked;
+            plot.redraw();
+        } else if(id == "enableparametric") {
+          plot.enableparametric = elem.checked;
+          if(plot.enableparametric) {
+            document.getElementById("eq").disabled = true
+            //document.getElementById("xrange").disabled = true
+            //document.getElementById("yrange").disabled = true
+
+            document.getElementById("x").disabled = false
+            document.getElementById("y").disabled = false
+            document.getElementById("tRangeLeft").disabled = false
+            document.getElementById("tRangeRight").disabled = false
+          } else {
+            document.getElementById("eq").disabled = false
+            //document.getElementById("xrange").disabled = false
+            //document.getElementById("yrange").disabled = false
+
+            document.getElementById("x").disabled = true
+            document.getElementById("y").disabled = true
+            document.getElementById("tRangeLeft").disabled = true
+            document.getElementById("tRangeRight").disabled = true
+          }
+
+          plot.redraw();
+        }
+      }
+    </script>
+  </head>
+  <body onload="loadDocument()">
+    <div id="container">
+    <div id="left">
+    <canvas style="floating: left;"id="canvas"></canvas>
+    </div>
+    <div id="center">
+    <canvas width="300" style="floating: left;"id="legend"></canvas>
+    </div>    
+    
+    <div id="right">
+    <table>
+      <tr>
+        <td>
+          Equation: y =
+        </td>
+        <td>
+          <input type="text" id = "eq"  onkeydown="if (event.keyCode == 13) f()" value="sin(x)*(pow(sin(x),2)+pow(cos(x),2))*e/pi"/>
+        </td>
+        <td>
+           XShift:
+        </td>
+         <td>
+          <input type="text" id = "xshift"  onkeydown="if (event.keyCode == 13) f()" value="0"/>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          XRange:
+        </td>
+        <td>
+          <input type="text" id="xrange" value="10" width="25" onkeydown="if (event.keyCode == 13) f()"/>
+        </td>
+        <td>
+           YShift:
+        </td>
+         <td>
+          <input type="text" id = "yshift"  onkeydown="if (event.keyCode == 13) f()" value="0"/>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          YRange:
+        </td>
+        <td>
+          <input type="text" id="yrange" value="10" width="25" onkeydown="if (event.keyCode == 13) f()"/>
+        </td>
+        <td>
+           Parametric Equations (t):
+        </td>
+        <td>
+          <input onchange="toggleCheckbox('enableparametric')" type="checkbox" id="enableparametric" value="enableparametric">
+        </td>
+      </tr>
+      <tr>
+        <td>
+          Color
+        </td>
+        <td>
+          <select id="color">
+            <option value="red" selected="selected">Red</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+            <option value="black">Black</option>
+            <option value="yellow">Yellow</option>
+          </select>
+        </td>
+           
+         <td>
+          x =
+        </td>
+        <td><input type="text" id = "x"  onkeydown="if (event.keyCode == 13) f()" value="5*sin(t)" disabled/></td>
+      </tr>
+      <tr>
+        <td>
+          Show grid
+        </td>
+        <td>
+          <input onchange="toggleCheckbox('enablegrid')" type="checkbox" id="enablegrid" value="enablegrid">
+        </td>
+        <td>
+          y = 
+        </td>
+        <td><input type="text" id = "y"  onkeydown="if (event.keyCode == 13) f()" value="5*cos(t)" disabled/></td>
+      </tr>
+      <tr>
+        <td>
+          Show Axis
+        </td>
+        <td>
+          <input onchange="toggleCheckbox('enableaxis')" type="checkbox" id="enableaxis" value="enableaxis" checked><br>
+        </td>
+        <td>
+          Min(t) : 
+        </td>
+        <td><input type="text" id = "tRangeLeft"  onkeydown="if (event.keyCode == 13) f()" value="0" disabled/></td>
+      </tr>
+      <tr>
+        <td colspan="2"></td>
+        <td>
+          Max(t) : 
+        </td>
+        <td><input type="text" id = "tRangeRight"  onkeydown="if (event.keyCode == 13) f()" value="2*pi" disabled/></td>
+      </tr>
+      <tr>
+        <td>
+          <button  onclick="erase_one()"> Erase </button>
+        </td>
+        <td>
+         <input type="text" hint="Enter index to delete" id="erase_index" value="1"/>
+       </td>
+       <tr>
+        <td>
+        </td>
+       </tr>
+       <tr>
+        <td>
+        </td>
+       </tr>
+     </tr>
+      <tr>
+        <td>
+          <button  onclick="f()"> Plot </button>
+        </td>
+        <td>
+         <button  onclick="erase()"> Erase All </button>
+       </td>
+     </tr>
+    </table>
+  </div>
+  </div>
+
+  </body>
+</html>
